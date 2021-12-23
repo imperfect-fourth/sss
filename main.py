@@ -25,6 +25,22 @@ async def on_ready():
     print('Secret Santa Services reporting for duty')
 
 
+def dump_message_id(message_id):
+    with open('message_id', 'w+') as f:
+        f.write(str(message_id))
+
+
+def load_message_id():
+    global STATE
+    try:
+        with open('message_id', 'r') as f:
+            STATE['message'] = int(f.read().strip())
+            STATE['waiting_for_reacts'] = True
+        print('loaded message id: '.format(STATE['message']))
+    except:
+        pass
+
+
 @bot.command(name='start')
 async def start(ctx):
     global STATE, SANTA_IMG, SANTA_EMOJI
@@ -36,16 +52,20 @@ async def start(ctx):
     STATE['santa_role'] = santa_role
     STATE['guild'] = ctx.guild
 
-    embed = Embed(title='Secret Santa Services', description='hoe hoe hoe SSS reporting for duty\nReact with :santa: to take part in Secret Santa :D', color=0xef2929)
-    embed.set_thumbnail(url='attachment://santa.png')
+    if STATE.get('message', '') == '':
+        print('message not found, creating')
+        embed = Embed(title='Secret Santa Services', description='hoe hoe hoe SSS reporting for duty\nReact with :santa: to take part in Secret Santa :D', color=0xef2929)
+        embed.set_thumbnail(url='attachment://santa.png')
 
-    message = await ctx.send(file=SANTA_IMG, embed=embed)
-    await message.add_reaction(SANTA_EMOJI)
-    print('message id: {}'.format(message.id))
-    STATE['message'] = message.id
-    STATE['waiting_for_reacts'] = True
+        message = await ctx.send(file=SANTA_IMG, embed=embed)
+        await message.add_reaction(SANTA_EMOJI)
+        print('message id: {}'.format(message.id))
+        STATE['message'] = message.id
+        STATE['waiting_for_reacts'] = True
     print('waiting for reacts')
-    
+
+    dump_message_id(message.id)
+
 
 def act_on_react(payload):
     global STATE, SANTA_EMOJI
@@ -86,9 +106,9 @@ def load_participants():
             for line in f.readlines():
                 line = line.strip().split()
                 PARTICIPANTS[int(line[0])] = line[1]=='True'
+        print('loaded participants: '.format(PARTICIPANTS))
     except:
         pass
-    print(PARTICIPANTS)
 
 
 @bot.event
@@ -150,9 +170,9 @@ def load_address_book():
             for line in f.readlines():
                 line = line.strip().split()
                 ADDRESS_BOOK[int(line[0])] = ' '.join(line[1:])
+        print('loaded address book: '.format(ADDRESS_BOOK))
     except:
         pass
-    print(ADDRESS_BOOK)
 
 
 @bot.event
@@ -206,6 +226,7 @@ async def on_disconnect():
 
 
 if __name__ == '__main__':
+    load_message_id()
     load_participants()
     load_address_book()
     bot.run(_BOT_TOKEN)
