@@ -23,6 +23,7 @@ STATE = {
 }
 
 def bot_init(guild_id):
+    print(guild_id)
     global STATE, INIT
     guild = bot.get_guild(guild_id)
     STATE['guild'] = guild
@@ -61,9 +62,6 @@ def load_message_id():
 async def start(ctx):
     print('command called: start')
     global STATE, SANTA_IMG, SANTA_EMOJI
-    global INIT
-    if not INIT:
-        bot_init(message.guild.id)
 
     if STATE.get('message', '') == '':
         print('event message not found, creating')
@@ -102,6 +100,32 @@ async def cancel(ctx):
     dump_participants()
     print('unset participants')
     await ctx.send('Event cancelled')
+
+
+@bot.command(name='status')
+async def status(ctx):
+    print('command called: status')
+
+    global STATE
+    if not STATE['waiting_for_reacts']:
+        await ctx.send('No active event found. Start an event by sending `sss start`')
+        return
+    global PARTICIPANTS, ADDRESS_BOOK
+    embed = Embed(title='Secret Santa Services', description='Event status', color=0xef2929)
+    participants_field = ''
+    no_address_field = ''
+    for i, v in PARTICIPANTS.items():
+        if v:
+            participants_field += '<@{}>\n'.format(i)
+            if ADDRESS_BOOK[i] == '':
+                no_address_field += '<@{}>\n'.format(i)
+    if participants_field == '':
+        participants_field = 'No one has joined yet'
+    embed.add_field(name='Participants:', value=participants_field, inline=False)
+    if not (no_address_field == ''):
+        embed.add_field(name='Following people haven\'t added address', value=no_address_field, inline=False)
+
+    await ctx.send(embed=embed)
 
 
 def act_on_react(payload):
@@ -222,7 +246,7 @@ def load_address_book():
 async def on_message(message):
     global INIT
     if not INIT:
-        bot_init(message)
+        bot_init(message.guild.id)
     if message.author == bot.user:
         return
     if not isinstance(message.channel, channel.DMChannel):
