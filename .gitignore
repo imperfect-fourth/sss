@@ -129,6 +129,7 @@ dmypy.json
 .pyre/
 
 address_book
+phone_book
 participants
 message_id
 secret_santas

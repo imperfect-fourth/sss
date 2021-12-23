@@ -132,16 +132,21 @@ async def status(ctx):
     embed = Embed(title='Secret Santa Services', description='Event status', color=0xef2929)
     participants_field = ''
     no_address_field = ''
+    no_phone_field = ''
     for i, v in PARTICIPANTS.items():
         if v:
             participants_field += '<@{}>\n'.format(i)
             if ADDRESS_BOOK[i] == '':
                 no_address_field += '<@{}>\n'.format(i)
+            if PHONE_BOOK[i] == '':
+                no_phone_field += '<@{}>\n'.format(i)
     if participants_field == '':
         participants_field = 'No one has joined yet'
     embed.add_field(name='Participants:', value=participants_field, inline=False)
     if not (no_address_field == ''):
-        embed.add_field(name='Following people haven\'t added address', value=no_address_field, inline=False)
+        embed.add_field(name='address not added by:', value=no_address_field, inline=False)
+    if not (no_phone_field == ''):
+        embed.add_field(name='number not added by:', value=no_phone_field, inline=False)
 
     await ctx.send(embed=embed)
 
@@ -204,12 +209,12 @@ async def shuffle(ctx):
     no_phone = []
     for i, v in PARTICIPANTS.items():
         if v:
+            if (ADDRESS_BOOK[i] != '') and (PHONE_BOOK[i] != ''):
+                with_address_and_phone.append(i)
             if ADDRESS_BOOK[i] == '':
                 no_address.append(i)
-            elif PHONE_BOOK[i] == '':
+            if PHONE_BOOK[i] == '':
                 no_phone.append(i)
-            else:
-                with_address_and_phone.append(i)
 
     if no_address != [] or no_phone != []:
         print('people with incomplete info found, can\'t shuffle')
@@ -400,12 +405,12 @@ def load_phone_book():
 
 @bot.event
 async def on_message(message):
-    global INIT
-    if not INIT:
-        await bot_init(message.guild.id)
     if message.author == bot.user:
         return
     if not isinstance(message.channel, channel.DMChannel):
+        global INIT
+        if not INIT:
+            await bot_init(message.guild.id)
         await bot.process_commands(message)
         return
     global STATE, PARTICIPANTS
@@ -430,11 +435,11 @@ async def on_message(message):
         if line[1] == 'address':
             ADDRESS_BOOK[message.author.id] = ' '.join(line[2:])
             print('address added: {} {}'.format(message.author, ADDRESS_BOOK[message.author.id]))
-            await message.channel.send('hoe hoe hoe your address has been set as:\n{}'.format(ADDRESS_BOOK[message.author.id]))
+            await message.channel.send('hoe hoe hoe your address has been set as:\n`{}`'.format(ADDRESS_BOOK[message.author.id]))
         elif line[1] == 'number':
             PHONE_BOOK[message.author.id] = ' '.join(line[2:])
-            print('number added: {} {}'.format(message.author, ADDRESS_BOOK[message.author.id]))
-            await message.channel.send('hoe hoe hoe your number has been set as:\n{}'.format(ADDRESS_BOOK[message.author.id]))
+            print('number added: {} {}'.format(message.author, PHONE_BOOK[message.author.id]))
+            await message.channel.send('hoe hoe hoe your number has been set as:\n`{}`'.format(PHONE_BOOK[message.author.id]))
     if message.content.strip() == 'get':
         address = ADDRESS_BOOK[message.author.id]
         number = PHONE_BOOK[message.author.id]
@@ -442,14 +447,14 @@ async def on_message(message):
             address = 'not set'
         if number == '':
             number = 'not set'
-        await message.channel.send('hoe hoe hoe here is your info:\naddress: {}\n number: {}'.format(address, number))
+        await message.channel.send('hoe hoe hoe here is your info:\n**address:** `{}`\n**number:** `{}`'.format(address, number))
     if message.content.strip() == 'clear':
         del(ADDRESS_BOOK[message.author.id])
         del(PHONE_BOOK[message.author.id])
         print('address removed: {}'.format(message.author))
         print('number removed: {}'.format(message.author))
         await message.channel.send('hoe hoe hoe your address has been deleted from the address book')
-        await message.channel.send('hoe hoe hoe your number has been deleted from the phonebook book')
+        await message.channel.send('hoe hoe hoe your number has been deleted from the phone book')
 
     dump_address_book()
     dump_phone_book()
