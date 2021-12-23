@@ -83,6 +83,7 @@ async def on_raw_reaction_add(payload):
     await user.add_roles(STATE['santa_role'])
     print('role added: {}'.format(user))
     PARTICIPANTS[user_id] = True
+    print('participant added: {}'.format(user_id))
 
     channel = await user.create_dm()
     await channel.send('hoe hoe hoe welcome to Secret Santa Services :santa:, hoe\nType `help` to get a list of commands')
@@ -100,6 +101,7 @@ async def on_raw_reaction_remove(payload):
     await user.remove_roles(STATE['santa_role'])
     print('role removed: {}'.format(user))
     PARTICIPANTS[user_id] = False
+    print('participant removed: {}'.format(user_id))
 
     channel = await user.create_dm()
     await channel.send('hoe hoe hoe you have withdrawn from Secret Santa. Thank you for using Secret Santa Services :santa:, hoe')
@@ -119,12 +121,18 @@ async def on_message(message):
     if not isinstance(message.channel, channel.DMChannel):
         await bot.process_commands(message)
         return
-    global STATE
+    global STATE, PARTICIPANTS
     if not STATE['waiting_for_reacts']:
         print('Secret Santa Services is not handling any Secret Santa event right now. Ask your admin to start an event by sending `sss start` in server')
         return
+
     if message.content.strip() == 'help':
         await message.channel.send('hoe hoe hoe here is a list of commands:\n`set <address>` to set your address\n`get` to get your address\n`clear` to clear your address')
+
+    if not PARTICIPANTS[message.author.id]:
+        await message.channel.send('First react on the message in server to participate')
+        return
+
     global ADDRESS_BOOK
     if message.content.strip().split()[0] == 'set':
         ADDRESS_BOOK[message.author.id] = message.content.strip().lstrip('set ')
@@ -138,7 +146,7 @@ async def on_message(message):
         await message.channel.send('hoe hoe hoe your address is set as:\n{}'.format(address))
     if message.content.strip() == 'clear':
         del(ADDRESS_BOOK[message.author.id])
-        print('address deleted: {}'.format(message.author))
+        print('address removed: {}'.format(message.author))
         await message.channel.send('hoe hoe hoe your address has been deleted from the address book')
 
     dump_address_book()
