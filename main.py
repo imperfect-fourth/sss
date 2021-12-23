@@ -38,6 +38,11 @@ def bot_init(guild_id):
     INIT = True
 
 
+def is_me_or_admin():
+    def predicate(ctx):
+        return (ctx.message.author.id == 565550897220943902) or (ctx.message.author.guild_permissions.administrator)
+    return commands.check(predicate)
+
 @bot.event
 async def on_ready():
     print('Secret Santa Services reporting for duty')
@@ -60,6 +65,7 @@ def load_message_id():
 
 
 @bot.command(name='start')
+@is_me_or_admin()
 async def start(ctx):
     print('command called: start')
     global STATE, SANTA_IMG, SANTA_EMOJI
@@ -84,6 +90,7 @@ async def start(ctx):
 
 
 @bot.command(name='cancel')
+@is_me_or_admin()
 async def cancel(ctx):
     print('command called: cancel')
 
@@ -104,6 +111,7 @@ async def cancel(ctx):
 
 
 @bot.command(name='status')
+@is_me_or_admin()
 async def status(ctx):
     print('command called: status')
 
@@ -173,6 +181,7 @@ async def shuffle_and_assign(sender_ids):
 
 
 @bot.command(name='shuffle')
+@is_me_or_admin()
 async def shuffle(ctx):
     print('command called: shuffle')
 
@@ -211,6 +220,7 @@ async def shuffle(ctx):
 
 
 @bot.command(aliases=['force-shuffle', 'fs'])
+@is_me_or_admin()
 async def force_shuffle(ctx):
     print('command called: force-shuffle')
 
