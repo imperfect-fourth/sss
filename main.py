@@ -36,7 +36,7 @@ def load_message_id():
         with open('message_id', 'r') as f:
             STATE['message'] = int(f.read().strip())
             STATE['waiting_for_reacts'] = True
-        print('loaded message id: '.format(STATE['message']))
+        print('loaded message id: {}'.format(STATE['message']))
     except:
         pass
 
@@ -53,7 +53,7 @@ async def start(ctx):
     STATE['guild'] = ctx.guild
 
     if STATE.get('message', '') == '':
-        print('message not found, creating')
+        print('event message not found, creating')
         embed = Embed(title='Secret Santa Services', description='hoe hoe hoe SSS reporting for duty\nReact with :santa: to take part in Secret Santa :D', color=0xef2929)
         embed.set_thumbnail(url='attachment://santa.png')
 
@@ -62,9 +62,12 @@ async def start(ctx):
         print('message id: {}'.format(message.id))
         STATE['message'] = message.id
         STATE['waiting_for_reacts'] = True
-    print('waiting for reacts')
 
-    dump_message_id(message.id)
+        dump_message_id(message.id)
+    else:
+        print('event message exists')
+        await ctx.send('Another Secret Santa event is active. Cancel that event first by sending `sss cancel`')
+    print('waiting for reacts')
 
 
 def act_on_react(payload):
