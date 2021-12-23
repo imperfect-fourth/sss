@@ -64,17 +64,20 @@ def act_on_react(payload):
     return True
 
 
+global PARTICIPANTS
+PARTICIPANTS = defaultdict(bool)
 @bot.event
 async def on_raw_reaction_add(payload):
     if not act_on_react(payload):
         return
-    global STATE
+    global STATE, PARICIPANTS
     user_id = payload.user_id
     user = STATE['guild'].get_member(user_id)
     if STATE['santa_role'] in user.roles:
         return
     await user.add_roles(STATE['santa_role'])
     print('role added: {}'.format(user))
+    PARTICIPANTS[user_id] = True
 
     channel = await user.create_dm()
     await channel.send('hoe hoe hoe welcome to Secret Santa Services :santa:, hoe\nType `help` to get a list of commands')
@@ -84,13 +87,14 @@ async def on_raw_reaction_add(payload):
 async def on_raw_reaction_remove(payload):
     if not act_on_react(payload):
         return
-    global STATE
+    global STATE, PARTICIPANTS
     user_id = payload.user_id
     user = STATE['guild'].get_member(user_id)
     if not STATE['santa_role'] in user.roles:
         return
     await user.remove_roles(STATE['santa_role'])
     print('role removed: {}'.format(user))
+    PARTICIPANTS[user_id] = False
 
     channel = await user.create_dm()
     await channel.send('hoe hoe hoe you have withdrawn from Secret Santa. Thank you for using Secret Santa Services :santa:, hoe')
@@ -111,16 +115,16 @@ async def on_message(message):
         await message.channel.send('hoe hoe hoe here is a list of commands:\n`set <address>` to set your address\n`get` to get your address\n`clear` to clear your address')
     global ADDRESS_BOOK
     if message.content.strip().split()[0] == 'set':
-        ADDRESS_BOOK['{}'.format(message.author)] = message.content.strip().lstrip('set ')
-        await message.channel.send('hoe hoe hoe your address has been set as:\n{}'.format(ADDRESS_BOOK['{}'.format(message.author)]))
+        ADDRESS_BOOK[message.author.id] = message.content.strip().lstrip('set ')
+        await message.channel.send('hoe hoe hoe your address has been set as:\n{}'.format(ADDRESS_BOOK[message.author.id]))
     if message.content.strip() == 'get':
-        address = ADDRESS_BOOK['{}'.format(message.author)]
+        address = ADDRESS_BOOK[message.author.id]
         if address == '':
-            await client.send_message('you haven\'t set an address yet, dumbhoe. set address by sending `set <address>`')
+            await messagei.channel.send('you haven\'t set an address yet, dumbhoe. set address by sending `set <address>`')
             return
         await message.channel.send('hoe hoe hoe your address is set as:\n{}'.format(address))
     if message.content.strip() == 'clear':
-        del(ADDRESS_BOOK['{}'.format(message.author)])
+        del(ADDRESS_BOOK[message.author.id])
         await message.channel.send('hoe hoe hoe your address has been deleted from the address book')
 
 
