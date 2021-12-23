@@ -4,6 +4,7 @@ from collections import defaultdict
 from discord import channel, Embed, File, Intents, utils
 from discord.ext import commands
 from dotenv import load_dotenv
+import random
 import os
 
 load_dotenv()
@@ -126,6 +127,85 @@ async def status(ctx):
         embed.add_field(name='Following people haven\'t added address', value=no_address_field, inline=False)
 
     await ctx.send(embed=embed)
+
+
+def test(array1, array2):
+    for i in range(len(array1)):
+        if array1[i] == array2[i]:
+            print(i)
+            return False
+    return True
+
+
+def dump_secret_santas(secret_santas):
+    with open('secret_santas', 'w+') as f:
+        f.write('\n'.join(['{} {}'.format(i, v) for i, v in secret_santas.items()]))
+
+
+async def shuffle_and_assign(sender_ids):
+    receiver_ids = [_ for _ in sender_ids]
+
+    random.shuffle(receiver_ids)
+    while not test(sender_ids, receiver_ids):
+        print(sender_ids, receiver_ids)
+        input()
+        random.shuffle(receiver_ids)
+ 
+    global STATE
+    users = {}
+
+    secret_santas = {}
+    for i, sender_id in enumerate(sender_ids):
+        receiver_id = receiver_ids[i]
+        if users.get(sender_id, '') == '':
+            users[sender_id] = STATE['guild'].get_member(sender_id)
+        if users.get(receiver_id, '') == '':
+            users[receiver_id] = STATE['guild'].get_member(receiver_id)
+        sender = users[sender_id]
+        receiver = users[receiver_id]
+        secret_santas['{}'.format(sender)] = '{}'.format(receiver)
+
+        print('secret santa set: {} {}'.format(sender, receiver))
+        channel = await sender.create_dm()
+        await channel.send('hoe hoe hoe you are secret santa for {}!\ntheir address is:\n{}\n\nmerry christmas from Secret Santa Services :santa: hoe hoe, hoe'.format(receiver, ADDRESS_BOOK[receiver_id]))
+
+    dump_secret_santas(secret_santas)
+
+
+
+@bot.command(name='shuffle')
+async def shuffle(ctx):
+    print('command called: shuffle')
+
+    global STATE
+    if not STATE['waiting_for_reacts']:
+        await ctx.send('No active event found. Start an event by sending `sss start`')
+        return
+    global PARTICIPANTS, ADDRESS_BOOK
+    with_address = []
+    no_address = []
+    for i, v in PARTICIPANTS.items():
+        if v:
+            if ADDRESS_BOOK[i] == '':
+                no_address.append(i)
+            else:
+                with_address.append(i)
+
+    if no_address != []:
+        print('people with no address found, can\'t shuffle')
+        desc = 'Following people have not added their address:\n'
+        for i in no_address:
+            desc += '<@{}>\n'.format(i)
+        embed = Embed(title='Secret Santa Services', description=desc, color=0xef2929)
+        embed.set_footer(text='Ask them to set address or send `sss force-shuffle` or `sss fs` to continue without them')
+        await ctx.send(embed=embed)
+    else:
+        STATE['waiting_for_reacts'] = False
+        STATE['message'] = ''
+        print('shuffling')
+        await shuffle_and_assign(with_address)
+        await ctx.send('Secret Santas assigned hoe hoe hoe')
+        print('shuffled')
 
 
 def act_on_react(payload):
