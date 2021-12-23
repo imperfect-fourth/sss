@@ -13,9 +13,9 @@ intents = Intents.default()
 intents.members = True
 bot = commands.Bot(command_prefix='sss ', intents=intents)
 
-global STATE, SANTA_IMG, SANTA_EMOJI
-SANTA_IMG = File('santa.png')
+global STATE, SANTA_IMG_PATH, SANTA_EMOJI
 SANTA_EMOJI = '🎅'
+SANTA_IMG_PATH = 'santa.png'
 STATE = {
     'waiting_for_reacts': False,
 }
@@ -25,9 +25,9 @@ async def on_ready():
     print('Secret Santa Services reporting for duty')
 
 
-def dump_message_id(message_id):
+def dump_message_id():
     with open('message_id', 'w+') as f:
-        f.write(str(message_id))
+        f.write(str(STATE['message']))
 
 
 def load_message_id():
@@ -43,6 +43,7 @@ def load_message_id():
 
 @bot.command(name='start')
 async def start(ctx):
+    print('command called: start')
     global STATE, SANTA_IMG, SANTA_EMOJI
     santa_role = utils.get(ctx.guild.roles, name='Secret Santa {}'.format(SANTA_EMOJI))
     if not santa_role:
@@ -57,17 +58,38 @@ async def start(ctx):
         embed = Embed(title='Secret Santa Services', description='hoe hoe hoe SSS reporting for duty\nReact with :santa: to take part in Secret Santa :D', color=0xef2929)
         embed.set_thumbnail(url='attachment://santa.png')
 
-        message = await ctx.send(file=SANTA_IMG, embed=embed)
+        santa_img = File(SANTA_IMG_PATH)
+        message = await ctx.send(file=santa_img, embed=embed)
         await message.add_reaction(SANTA_EMOJI)
         print('message id: {}'.format(message.id))
         STATE['message'] = message.id
         STATE['waiting_for_reacts'] = True
 
-        dump_message_id(message.id)
+        dump_message_id()
     else:
         print('event message exists')
         await ctx.send('Another Secret Santa event is active. Cancel that event first by sending `sss cancel`')
     print('waiting for reacts')
+
+
+@bot.command(name='cancel')
+async def cancel(ctx):
+    print('command called: cancel')
+
+    global STATE, PARTICIPANTS
+    if not STATE['waiting_for_reacts']:
+        print('no active event')
+        await ctx.send('No active event found. Start an event by sending `sss start`')
+        return
+
+    STATE['message'] = ''
+    STATE['waiting_for_reacts'] = False
+    dump_message_id()
+    print('unset message id')
+    PARTICIPANTS = defaultdict(bool)
+    dump_participants()
+    print('unset participants')
+    await ctx.send('Event cancelled')
 
 
 def act_on_react(payload):
@@ -117,7 +139,6 @@ def load_participants():
 @bot.event
 async def on_raw_reaction_add(payload):
     if not act_on_react(payload):
-        print('no act on react')
         return
     global STATE, PARICIPANTS
     user_id = payload.user_id
@@ -138,7 +159,6 @@ async def on_raw_reaction_add(payload):
 @bot.event
 async def on_raw_reaction_remove(payload):
     if not act_on_react(payload):
-        print('no act on react')
         return
     global STATE, PARTICIPANTS
     user_id = payload.user_id
