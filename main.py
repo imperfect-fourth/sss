@@ -11,14 +11,30 @@ _BOT_TOKEN = os.getenv('SSS_BOT_TOKEN')
 
 intents = Intents.default()
 intents.members = True
+intents.guilds = True
 bot = commands.Bot(command_prefix='sss ', intents=intents)
 
-global STATE, SANTA_IMG_PATH, SANTA_EMOJI
+global INIT, STATE, SANTA_IMG_PATH, SANTA_EMOJI
+INIT = False
 SANTA_EMOJI = '🎅'
 SANTA_IMG_PATH = 'santa.png'
 STATE = {
     'waiting_for_reacts': False,
 }
+
+def bot_init(guild_id):
+    global STATE, INIT
+    guild = bot.get_guild(guild_id)
+    STATE['guild'] = guild
+
+    santa_role = utils.get(guild.roles, name='Secret Santa {}'.format(SANTA_EMOJI))
+    if not santa_role:
+        print('role not found')
+        santa_role = guild.create_role(name='Secret Santa {}'.format(SANTA_EMOJI), colour=0xef2929, mentionable=True)
+        print('role created')
+    STATE['santa_role'] = santa_role
+    INIT = True
+
 
 @bot.event
 async def on_ready():
@@ -45,13 +61,9 @@ def load_message_id():
 async def start(ctx):
     print('command called: start')
     global STATE, SANTA_IMG, SANTA_EMOJI
-    santa_role = utils.get(ctx.guild.roles, name='Secret Santa {}'.format(SANTA_EMOJI))
-    if not santa_role:
-        print('role not found')
-        santa_role = await ctx.guild.create_role(name='Secret Santa {}'.format(SANTA_EMOJI), colour=0xef2929, mentionable=True)
-        print('role created')
-    STATE['santa_role'] = santa_role
-    STATE['guild'] = ctx.guild
+    global INIT
+    if not INIT:
+        bot_init(message.guild.id)
 
     if STATE.get('message', '') == '':
         print('event message not found, creating')
@@ -138,17 +150,22 @@ def load_participants():
 
 @bot.event
 async def on_raw_reaction_add(payload):
+    global INIT
+    if not INIT:
+        bot_init(payload.guild_id)
     if not act_on_react(payload):
         return
     global STATE, PARICIPANTS
     user_id = payload.user_id
     user = STATE['guild'].get_member(user_id)
-    if STATE['santa_role'] in user.roles:
-        return
-    await user.add_roles(STATE['santa_role'])
-    print('role added: {}'.format(user))
+    print('react added: {}'.format(user))
+    if not STATE['santa_role'] in user.roles:
+        await user.add_roles(STATE['santa_role'])
+        print('role added: {}'.format(user))
+    else:
+        print('role already present: {}'.format(user))
     PARTICIPANTS[user_id] = True
-    print('participant added: {}'.format(user_id))
+    print('participant added: {}'.format(user))
 
     channel = await user.create_dm()
     await channel.send('hoe hoe hoe welcome to Secret Santa Services :santa:, hoe\nType `help` to get a list of commands')
@@ -158,17 +175,20 @@ async def on_raw_reaction_add(payload):
 
 @bot.event
 async def on_raw_reaction_remove(payload):
+    global INIT
+    if not INIT:
+        bot_init(payload.guild_id)
     if not act_on_react(payload):
         return
     global STATE, PARTICIPANTS
     user_id = payload.user_id
     user = STATE['guild'].get_member(user_id)
-    if not STATE['santa_role'] in user.roles:
-        return
-    await user.remove_roles(STATE['santa_role'])
-    print('role removed: {}'.format(user))
+    print('react removed: {}'.format(user))
+    if STATE['santa_role'] in user.roles:
+        await user.remove_roles(STATE['santa_role'])
+        print('role removed: {}'.format(user))
     PARTICIPANTS[user_id] = False
-    print('participant removed: {}'.format(user_id))
+    print('participant removed: {}'.format(user))
 
     channel = await user.create_dm()
     await channel.send('hoe hoe hoe you have withdrawn from Secret Santa. Thank you for using Secret Santa Services :santa:, hoe')
@@ -200,6 +220,9 @@ def load_address_book():
 
 @bot.event
 async def on_message(message):
+    global INIT
+    if not INIT:
+        bot_init(message)
     if message.author == bot.user:
         return
     if not isinstance(message.channel, channel.DMChannel):
