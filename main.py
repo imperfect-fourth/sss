@@ -148,7 +148,6 @@ async def shuffle_and_assign(sender_ids):
     random.shuffle(receiver_ids)
     while not test(sender_ids, receiver_ids):
         print(sender_ids, receiver_ids)
-        input()
         random.shuffle(receiver_ids)
  
     global STATE
@@ -206,6 +205,33 @@ async def shuffle(ctx):
         await shuffle_and_assign(with_address)
         await ctx.send('Secret Santas assigned hoe hoe hoe')
         print('shuffled')
+        PARTICIPANTS = defaultdict()
+        dump_message_id()
+        dump_participants()
+
+
+@bot.command(aliases=['force-shuffle', 'fs'])
+async def force_shuffle(ctx):
+    print('command called: force-shuffle')
+
+    global STATE
+    if not STATE['waiting_for_reacts']:
+        await ctx.send('No active event found. Start an event by sending `sss start`')
+        return
+    global PARTICIPANTS, ADDRESS_BOOK
+    with_address = []
+    for i, v in PARTICIPANTS.items():
+        if v:
+            if ADDRESS_BOOK[i] != '':
+                with_address.append(i)
+
+    STATE['message'] = ''
+    print('shuffling')
+    await shuffle_and_assign(with_address)
+    await ctx.send('Secret Santas assigned hoe hoe hoe')
+    print('shuffled')
+    dump_message_id()
+    dump_participants()
 
 
 def act_on_react(payload):
