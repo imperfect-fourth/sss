@@ -28,7 +28,11 @@ async def on_ready():
 @bot.command(name='start')
 async def start(ctx):
     global STATE, SANTA_IMG, SANTA_EMOJI
-    santa_role = await ctx.guild.create_role(name='Secret Santa {}'.format(SANTA_EMOJI), colour=0xef2929, mentionable=True)
+    santa_role = utils.get(ctx.guild.roles, name='Secret Santa {}'.format(SANTA_EMOJI))
+    if not santa_role:
+        print('role not found')
+        santa_role = await ctx.guild.create_role(name='Secret Santa {}'.format(SANTA_EMOJI), colour=0xef2929, mentionable=True)
+        print('role created')
     STATE['santa_role'] = santa_role
     STATE['guild'] = ctx.guild
 
@@ -37,9 +41,10 @@ async def start(ctx):
 
     message = await ctx.send(file=SANTA_IMG, embed=embed)
     await message.add_reaction(SANTA_EMOJI)
-    STATE['message'] = message
+    print('message id: {}'.format(message.id))
+    STATE['message'] = message.id
     STATE['waiting_for_reacts'] = True
-    print('waiting for reactions')
+    print('waiting for reacts')
     
 
 def act_on_react(payload):
@@ -54,7 +59,7 @@ def act_on_react(payload):
     if not STATE['waiting_for_reacts']:
         print('wait')
         return False
-    if message_id != STATE['message'].id:
+    if message_id != STATE['message']:
         print('m')
         return False
     if reaction != SANTA_EMOJI:
@@ -102,6 +107,13 @@ async def on_raw_reaction_remove(payload):
 
 global ADDRESS_BOOK
 ADDRESS_BOOK = defaultdict(str)
+
+def dump_address_book():
+    content = '\n'.join(['{} {}'.format(i, v) for i, v in ADDRESS_BOOK.items()])
+    with open('address_book', 'w+') as f:
+        f.write(content)
+
+
 @bot.event
 async def on_message(message):
     if not isinstance(message.channel, channel.DMChannel):
@@ -116,6 +128,7 @@ async def on_message(message):
     global ADDRESS_BOOK
     if message.content.strip().split()[0] == 'set':
         ADDRESS_BOOK[message.author.id] = message.content.strip().lstrip('set ')
+        print('address added: {} {}'.format(message.author, ADDRESS_BOOK[message.author.id]))
         await message.channel.send('hoe hoe hoe your address has been set as:\n{}'.format(ADDRESS_BOOK[message.author.id]))
     if message.content.strip() == 'get':
         address = ADDRESS_BOOK[message.author.id]
@@ -125,7 +138,10 @@ async def on_message(message):
         await message.channel.send('hoe hoe hoe your address is set as:\n{}'.format(address))
     if message.content.strip() == 'clear':
         del(ADDRESS_BOOK[message.author.id])
+        print('address deleted: {}'.format(message.author))
         await message.channel.send('hoe hoe hoe your address has been deleted from the address book')
+
+    dump_address_book()
 
 
 @bot.event
