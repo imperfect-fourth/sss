@@ -13,7 +13,7 @@ _BOT_TOKEN = os.getenv('SSS_BOT_TOKEN')
 intents = Intents.default()
 intents.members = True
 intents.guilds = True
-bot = commands.Bot(command_prefix='sss ', intents=intents)
+bot = commands.Bot(command_prefix='sss ', intents=intents, help_command=None)
 
 global INIT, STATE, SANTA_IMG_PATH, SANTA_EMOJI
 INIT = False
@@ -23,8 +23,7 @@ STATE = {
     'waiting_for_reacts': False,
 }
 
-def bot_init(guild_id):
-    print(guild_id)
+async def bot_init(guild_id):
     global STATE, INIT
     guild = bot.get_guild(guild_id)
     STATE['guild'] = guild
@@ -32,7 +31,7 @@ def bot_init(guild_id):
     santa_role = utils.get(guild.roles, name='Secret Santa {}'.format(SANTA_EMOJI))
     if not santa_role:
         print('role not found')
-        santa_role = guild.create_role(name='Secret Santa {}'.format(SANTA_EMOJI), colour=0xef2929, mentionable=True)
+        santa_role = await guild.create_role(name='Secret Santa {}'.format(SANTA_EMOJI), colour=0xef2929, mentionable=True)
         print('role created')
     STATE['santa_role'] = santa_role
     INIT = True
@@ -47,6 +46,15 @@ def is_me_or_admin():
 async def on_ready():
     print('Secret Santa Services reporting for duty')
 
+
+@bot.command(name='help')
+async def help(ctx):
+    print('command called: help')
+    await ctx.send('Here is a list of commands:\n\
+`sss start`: start the Secret Santa event\n\
+`sss cancel`: cancel ongoing Secret Santa event\n\
+`sss status`: check status of Secret Santa event\n\
+`sss shuffle`: assign Secret Santas to everyone participating')
 
 def dump_message_id():
     with open('message_id', 'w+') as f:
@@ -86,6 +94,7 @@ async def start(ctx):
     else:
         print('event message exists')
         await ctx.send('Another Secret Santa event is active. Cancel that event first by sending `sss cancel`')
+    print(STATE)
     print('waiting for reacts')
 
 
@@ -189,29 +198,40 @@ async def shuffle(ctx):
     if not STATE['waiting_for_reacts']:
         await ctx.send('No active event found. Start an event by sending `sss start`')
         return
-    global PARTICIPANTS, ADDRESS_BOOK
-    with_address = []
+    global PARTICIPANTS, ADDRESS_BOOK, PHONE_BOOK
+    with_address_and_phone = []
     no_address = []
+    no_phone = []
     for i, v in PARTICIPANTS.items():
         if v:
             if ADDRESS_BOOK[i] == '':
                 no_address.append(i)
+            elif PHONE_BOOK[i] == '':
+                no_phone.append(i)
             else:
-                with_address.append(i)
+                with_address_and_phone.append(i)
 
-    if no_address != []:
-        print('people with no address found, can\'t shuffle')
-        desc = 'Following people have not added their address:\n'
-        for i in no_address:
-            desc += '<@{}>\n'.format(i)
+    if no_address != [] or no_phone != []:
+        print('people with incomplete info found, can\'t shuffle')
+        desc = ''
+        if no_address != []:
+            desc += 'Following people have not added their address:\n'
+            for i in no_address:
+                desc += '<@{}>\n'.format(i)
+
+        if no_phone != []:
+            desc += '\nFollowing people have not added their number:\n'
+            for i in no_phone:
+                desc += '<@{}>\n'.format(i)
+
         embed = Embed(title='Secret Santa Services', description=desc, color=0xef2929)
-        embed.set_footer(text='Ask them to set address or send `sss force-shuffle` or `sss fs` to continue without them')
+        embed.set_footer(text='Ask them to set address and number or send `sss force-shuffle` or `sss fs` to continue without them')
         await ctx.send(embed=embed)
     else:
         STATE['waiting_for_reacts'] = False
         STATE['message'] = ''
         print('shuffling')
-        await shuffle_and_assign(with_address)
+        await shuffle_and_assign(with_address_and_phone)
         await ctx.send('Secret Santas assigned hoe hoe hoe')
         print('shuffled')
         PARTICIPANTS = defaultdict()
@@ -228,16 +248,16 @@ async def force_shuffle(ctx):
     if not STATE['waiting_for_reacts']:
         await ctx.send('No active event found. Start an event by sending `sss start`')
         return
-    global PARTICIPANTS, ADDRESS_BOOK
-    with_address = []
+    global PARTICIPANTS, ADDRESS_BOOK, PHONE_BOOK
+    with_address_and_phone = []
     for i, v in PARTICIPANTS.items():
         if v:
-            if ADDRESS_BOOK[i] != '':
-                with_address.append(i)
+            if (ADDRESS_BOOK[i] != '') and (PHONE_BOOK[i] != ''):
+                with_address_and_phone.append(i)
 
     STATE['message'] = ''
     print('shuffling')
-    await shuffle_and_assign(with_address)
+    await shuffle_and_assign(with_address_and_phone)
     await ctx.send('Secret Santas assigned hoe hoe hoe')
     print('shuffled')
     dump_message_id()
@@ -292,7 +312,7 @@ def load_participants():
 async def on_raw_reaction_add(payload):
     global INIT
     if not INIT:
-        bot_init(payload.guild_id)
+        await bot_init(payload.guild_id)
     if not act_on_react(payload):
         return
     global STATE, PARICIPANTS
@@ -317,7 +337,7 @@ async def on_raw_reaction_add(payload):
 async def on_raw_reaction_remove(payload):
     global INIT
     if not INIT:
-        bot_init(payload.guild_id)
+        await bot_init(payload.guild_id)
     if not act_on_react(payload):
         return
     global STATE, PARTICIPANTS
@@ -336,8 +356,9 @@ async def on_raw_reaction_remove(payload):
     dump_participants()
 
 
-global ADDRESS_BOOK
+global ADDRESS_BOOK, PHONE_BOOK
 ADDRESS_BOOK = defaultdict(str)
+PHONE_BOOK = defaultdict(str)
 
 def dump_address_book():
     global ADDRESS_BOOK
@@ -358,11 +379,30 @@ def load_address_book():
         pass
 
 
+def dump_phone_book():
+    global PHONE_BOOK
+    content = '\n'.join(['{} {}'.format(i, v) for i, v in PHONE_BOOK.items()])
+    with open('phone_book', 'w+') as f:
+        f.write(content)
+
+
+def load_phone_book():
+    global PHONE_BOOK
+    try:
+        with open('phone_book', 'r') as f:
+            for line in f.readlines():
+                line = line.strip().split()
+                PHONE_BOOK[int(line[0])] = ' '.join(line[1:])
+        print('loaded phone book: ', PHONE_BOOK)
+    except:
+        pass
+
+
 @bot.event
 async def on_message(message):
     global INIT
     if not INIT:
-        bot_init(message.guild.id)
+        await bot_init(message.guild.id)
     if message.author == bot.user:
         return
     if not isinstance(message.channel, channel.DMChannel):
@@ -374,29 +414,45 @@ async def on_message(message):
         return
 
     if message.content.strip() == 'help':
-        await message.channel.send('hoe hoe hoe here is a list of commands:\n`set <address>` to set your address\n`get` to get your address\n`clear` to clear your address')
+        await message.channel.send('hoe hoe hoe here is a list of commands:\n\
+`set address <address>` to set your address\n\
+`set number <number>` to set your number\n\
+`get` to get your address and number\n\
+`clear` to clear your address and number')
 
     if not PARTICIPANTS[message.author.id]:
         await message.channel.send('First react on the message in server to participate')
         return
 
-    global ADDRESS_BOOK
-    if message.content.strip().split()[0] == 'set':
-        ADDRESS_BOOK[message.author.id] = message.content.strip().lstrip('set ')
-        print('address added: {} {}'.format(message.author, ADDRESS_BOOK[message.author.id]))
-        await message.channel.send('hoe hoe hoe your address has been set as:\n{}'.format(ADDRESS_BOOK[message.author.id]))
+    global ADDRESS_BOOK, PHONE_BOOK
+    line = message.content.strip().split()
+    if line[0] == 'set':
+        if line[1] == 'address':
+            ADDRESS_BOOK[message.author.id] = ' '.join(line[2:])
+            print('address added: {} {}'.format(message.author, ADDRESS_BOOK[message.author.id]))
+            await message.channel.send('hoe hoe hoe your address has been set as:\n{}'.format(ADDRESS_BOOK[message.author.id]))
+        elif line[1] == 'number':
+            PHONE_BOOK[message.author.id] = ' '.join(line[2:])
+            print('number added: {} {}'.format(message.author, ADDRESS_BOOK[message.author.id]))
+            await message.channel.send('hoe hoe hoe your number has been set as:\n{}'.format(ADDRESS_BOOK[message.author.id]))
     if message.content.strip() == 'get':
         address = ADDRESS_BOOK[message.author.id]
+        number = PHONE_BOOK[message.author.id]
         if address == '':
-            await message.channel.send('you haven\'t set an address yet, dumbhoe. set address by sending `set <address>`')
-            return
-        await message.channel.send('hoe hoe hoe your address is set as:\n{}'.format(address))
+            address = 'not set'
+        if number == '':
+            number = 'not set'
+        await message.channel.send('hoe hoe hoe here is your info:\naddress: {}\n number: {}'.format(address, number))
     if message.content.strip() == 'clear':
         del(ADDRESS_BOOK[message.author.id])
+        del(PHONE_BOOK[message.author.id])
         print('address removed: {}'.format(message.author))
+        print('number removed: {}'.format(message.author))
         await message.channel.send('hoe hoe hoe your address has been deleted from the address book')
+        await message.channel.send('hoe hoe hoe your number has been deleted from the phonebook book')
 
     dump_address_book()
+    dump_phone_book()
 
 
 @bot.event
@@ -415,4 +471,5 @@ if __name__ == '__main__':
     load_message_id()
     load_participants()
     load_address_book()
+    load_phone_book()
     bot.run(_BOT_TOKEN)
