@@ -71,6 +71,13 @@ def act_on_react(payload):
 
 global PARTICIPANTS
 PARTICIPANTS = defaultdict(bool)
+
+def dump_participants():
+    content = '\n'.join(['{} {}'.format(i, v) for i, v in PARTICIPANTS.items()])
+    with open('participants', 'w+') as f:
+        f.write(content)
+
+
 @bot.event
 async def on_raw_reaction_add(payload):
     if not act_on_react(payload):
@@ -87,6 +94,8 @@ async def on_raw_reaction_add(payload):
 
     channel = await user.create_dm()
     await channel.send('hoe hoe hoe welcome to Secret Santa Services :santa:, hoe\nType `help` to get a list of commands')
+
+    dump_participants()
 
 
 @bot.event
@@ -105,6 +114,8 @@ async def on_raw_reaction_remove(payload):
 
     channel = await user.create_dm()
     await channel.send('hoe hoe hoe you have withdrawn from Secret Santa. Thank you for using Secret Santa Services :santa:, hoe')
+
+    dump_participants()
 
 
 global ADDRESS_BOOK
