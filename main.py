@@ -73,14 +73,28 @@ global PARTICIPANTS
 PARTICIPANTS = defaultdict(bool)
 
 def dump_participants():
+    global PARTICIPANTS
     content = '\n'.join(['{} {}'.format(i, v) for i, v in PARTICIPANTS.items()])
     with open('participants', 'w+') as f:
         f.write(content)
 
 
+def load_participants():
+    global PARTICIPANTS
+    try:
+        with open('participants', 'r') as f:
+            for line in f.readlines():
+                line = line.strip().split()
+                PARTICIPANTS[int(line[0])] = line[1]=='True'
+    except:
+        pass
+    print(PARTICIPANTS)
+
+
 @bot.event
 async def on_raw_reaction_add(payload):
     if not act_on_react(payload):
+        print('no act on react')
         return
     global STATE, PARICIPANTS
     user_id = payload.user_id
@@ -101,6 +115,7 @@ async def on_raw_reaction_add(payload):
 @bot.event
 async def on_raw_reaction_remove(payload):
     if not act_on_react(payload):
+        print('no act on react')
         return
     global STATE, PARTICIPANTS
     user_id = payload.user_id
@@ -122,19 +137,34 @@ global ADDRESS_BOOK
 ADDRESS_BOOK = defaultdict(str)
 
 def dump_address_book():
+    global ADDRESS_BOOK
     content = '\n'.join(['{} {}'.format(i, v) for i, v in ADDRESS_BOOK.items()])
     with open('address_book', 'w+') as f:
         f.write(content)
 
 
+def load_address_book():
+    global ADDRESS_BOOK
+    try:
+        with open('address_book', 'r') as f:
+            for line in f.readlines():
+                line = line.strip().split()
+                ADDRESS_BOOK[int(line[0])] = ' '.join(line[1:])
+    except:
+        pass
+    print(ADDRESS_BOOK)
+
+
 @bot.event
 async def on_message(message):
+    if message.author == bot.user:
+        return
     if not isinstance(message.channel, channel.DMChannel):
         await bot.process_commands(message)
         return
     global STATE, PARTICIPANTS
     if not STATE['waiting_for_reacts']:
-        print('Secret Santa Services is not handling any Secret Santa event right now. Ask your admin to start an event by sending `sss start` in server')
+        await message.channel.send('Secret Santa Services is not handling any Secret Santa event right now. Ask your admin to start an event by sending `sss start` in server')
         return
 
     if message.content.strip() == 'help':
@@ -152,7 +182,7 @@ async def on_message(message):
     if message.content.strip() == 'get':
         address = ADDRESS_BOOK[message.author.id]
         if address == '':
-            await messagei.channel.send('you haven\'t set an address yet, dumbhoe. set address by sending `set <address>`')
+            await message.channel.send('you haven\'t set an address yet, dumbhoe. set address by sending `set <address>`')
             return
         await message.channel.send('hoe hoe hoe your address is set as:\n{}'.format(address))
     if message.content.strip() == 'clear':
@@ -176,4 +206,6 @@ async def on_disconnect():
 
 
 if __name__ == '__main__':
+    load_participants()
+    load_address_book()
     bot.run(_BOT_TOKEN)
