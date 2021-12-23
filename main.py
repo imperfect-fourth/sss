@@ -106,7 +106,7 @@ def load_participants():
             for line in f.readlines():
                 line = line.strip().split()
                 PARTICIPANTS[int(line[0])] = line[1]=='True'
-        print('loaded participants: '.format(PARTICIPANTS))
+        print('loaded participants: ', PARTICIPANTS)
     except:
         pass
 
@@ -170,7 +170,7 @@ def load_address_book():
             for line in f.readlines():
                 line = line.strip().split()
                 ADDRESS_BOOK[int(line[0])] = ' '.join(line[1:])
-        print('loaded address book: '.format(ADDRESS_BOOK))
+        print('loaded address book: ', ADDRESS_BOOK)
     except:
         pass
 
